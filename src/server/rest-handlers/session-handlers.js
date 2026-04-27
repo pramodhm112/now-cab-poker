@@ -225,6 +225,75 @@ export function getSession(request, response) {
     }
 }
 
+// GET /session/{session_id}/change-request — return the change_request currently
+// associated with this session, gated by *our* ACL: caller must be the chair or a
+// participant. Members lack platform-wide change_request read access, so they
+// cannot use the OOTB Table API; this endpoint is the authorized alternative.
+export function getSessionChangeRequest(request, response) {
+    try {
+        const sessionId = request.pathParams && request.pathParams.session_id;
+        const userId = gs.getUserID();
+
+        if (!sessionId) {
+            return sendJson(response, 400, { error: 'session_id path parameter is required' });
+        }
+        if (!userId) {
+            return sendJson(response, 401, { error: 'Authentication required' });
+        }
+
+        const sessionGr = new GlideRecord('x_1862662_cab_poke_session');
+        if (!sessionGr.get(sessionId)) {
+            return sendJson(response, 404, { error: 'Session not found' });
+        }
+
+        const isChair = sessionGr.getValue('chair_user') === userId;
+        let isParticipant = false;
+        if (!isChair) {
+            const part = new GlideRecord('x_1862662_cab_poke_participant');
+            part.addQuery('session', sessionId);
+            part.addQuery('user', userId);
+            part.query();
+            isParticipant = part.hasNext();
+        }
+        if (!isChair && !isParticipant) {
+            return sendJson(response, 403, { error: 'Not a member of this session' });
+        }
+
+        const crId = sessionGr.getValue('change_request');
+        if (!crId) {
+            return sendJson(response, 200, { change_request: null });
+        }
+
+        const crGr = new GlideRecord('change_request');
+        // The session's chair may have set this CR with elevated rights; we read it
+        // via the scoped handler and return only the fields the UI needs.
+        if (!crGr.get(crId)) {
+            return sendJson(response, 200, { change_request: null });
+        }
+
+        sendJson(response, 200, {
+            change_request: {
+                sys_id: crGr.getUniqueValue(),
+                number: crGr.getValue('number'),
+                short_description: crGr.getValue('short_description'),
+                description: crGr.getValue('description'),
+                risk: crGr.getValue('risk'),
+                risk_display: crGr.getDisplayValue('risk'),
+                impact: crGr.getValue('impact'),
+                impact_display: crGr.getDisplayValue('impact'),
+                priority: crGr.getValue('priority'),
+                priority_display: crGr.getDisplayValue('priority'),
+                state: crGr.getValue('state'),
+                state_display: crGr.getDisplayValue('state'),
+                category: crGr.getValue('category')
+            }
+        });
+    } catch (e) {
+        gs.error('CAB Poker - Get Session CR Exception: ' + e.message);
+        sendJson(response, 500, { error: 'Internal server error: ' + e.message });
+    }
+}
+
 // GET /session/{session_id}/participants — list of participants for the chair UI.
 export function getParticipants(request, response) {
     try {

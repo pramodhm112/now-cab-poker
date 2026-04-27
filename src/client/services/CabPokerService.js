@@ -330,7 +330,31 @@ export class CabPokerService {
         }
     }
 
-    // Enhanced method to get change request details with better error handling
+    // Get the change_request currently associated with a session, via our scoped
+    // Scripted REST endpoint. Members lack platform-wide change_request read
+    // access; this is the authorized path for them to read CR details.
+    // Returns the same flat shape as getSession.
+    async getSessionChangeRequest(sessionId) {
+        const response = await fetch(`${this.baseUrl}/session/${sessionId}/change-request`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-UserToken': window.g_ck || ''
+            }
+        });
+        const text = await response.text();
+        if (!response.ok) {
+            let msg = `HTTP ${response.status}: ${response.statusText}`;
+            try { msg = JSON.parse(text).error || msg; } catch (_) { msg = text || msg; }
+            throw new Error(msg);
+        }
+        const data = text ? JSON.parse(text) : {};
+        return data.change_request || null;
+    }
+
+    // Direct CR fetch via OOTB Table API. Used by the chair to browse arbitrary
+    // change_requests when selecting one for a session. Requires the caller to
+    // have change_request read access on this instance — fine for chairs.
     async getChangeRequest(changeRequestId) {
         try {
             console.log('Fetching change request:', changeRequestId);

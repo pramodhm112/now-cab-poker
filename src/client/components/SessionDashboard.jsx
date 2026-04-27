@@ -39,19 +39,22 @@ export default function SessionDashboard({ service, session, onError }) {
     const loadSessionData = async () => {
         try {
             const [sessionData, participantsData] = await Promise.all([
-                service.getSession(session.session_id).catch(() => null), // Don't fail if this fails
-                service.getParticipants(session.session_id).catch(() => []) // Return empty array if fails
+                service.getSession(session.session_id).catch(() => null),
+                service.getParticipants(session.session_id).catch(() => [])
             ]);
-            
+
             if (sessionData) {
                 setSessionDetails(sessionData);
 
-                // Load change request if one is selected
-                const changeRequestValue = typeof sessionData.change_request === 'object' 
-                    ? sessionData.change_request.value 
-                    : sessionData.change_request;
-                    
-                if (changeRequestValue && changeRequestValue !== 'NULL' && changeRequestValue !== '' && changeRequestValue !== changeRequest?.sys_id) {
+                // Resolve change_request safely. The new flat endpoint returns a
+                // string (or null/empty); the legacy Table API returned
+                // { value, display_value }. readField handles both, and crucially
+                // does NOT crash on null (typeof null === 'object').
+                const changeRequestValue = readField(sessionData, 'change_request');
+                const currentCrSysId = changeRequest && readField(changeRequest, 'sys_id');
+
+                if (changeRequestValue && changeRequestValue !== 'NULL' &&
+                    changeRequestValue !== currentCrSysId) {
                     try {
                         const crData = await service.getChangeRequest(changeRequestValue);
                         setChangeRequest(crData);
@@ -60,7 +63,7 @@ export default function SessionDashboard({ service, session, onError }) {
                     }
                 }
             }
-            
+
             setParticipants(participantsData || []);
         } catch (error) {
             onError('Failed to load session data: ' + error.message);

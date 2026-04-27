@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { RestApi } from '@servicenow/sdk/core'
-import { createSession, joinSession, joinSessionAlternative, getSession, getParticipants } from '../../server/rest-handlers/session-handlers.js'
+import { createSession, joinSession, joinSessionAlternative, getSession, getParticipants, getSessionChangeRequest } from '../../server/rest-handlers/session-handlers.js'
 import { startVoting, submitVote, revealVotes, finalizeSession } from '../../server/rest-handlers/voting-handlers.js'
 
 export const cabPokerApi = RestApi({
@@ -38,6 +38,16 @@ export const cabPokerApi = RestApi({
             method: 'GET',
             script: getParticipants,
             short_description: 'List participants of a session',
+            authentication: true,
+            authorization: true,
+        },
+        {
+            $id: Now.ID['get-session-cr'],
+            name: 'Get Session Change Request',
+            path: '/session/{session_id}/change-request',
+            method: 'GET',
+            script: getSessionChangeRequest,
+            short_description: 'Get the change_request associated with a session (chair or participants only)',
             authentication: true,
             authorization: true,
         },

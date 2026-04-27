@@ -39,19 +39,22 @@ export default function SessionDashboard({ service, session, onError }) {
     const loadSessionData = async () => {
         try {
             const [sessionData, participantsData] = await Promise.all([
-                service.getSession(session.session_id).catch(() => null), // Don't fail if this fails
-                service.getParticipants(session.session_id).catch(() => []) // Return empty array if fails
+                service.getSession(session.session_id).catch(() => null),
+                service.getParticipants(session.session_id).catch(() => [])
             ]);
-            
+
             if (sessionData) {
                 setSessionDetails(sessionData);
 
-                // Load change request if one is selected
-                const changeRequestValue = typeof sessionData.change_request === 'object' 
-                    ? sessionData.change_request.value 
-                    : sessionData.change_request;
-                    
-                if (changeRequestValue && changeRequestValue !== 'NULL' && changeRequestValue !== '' && changeRequestValue !== changeRequest?.sys_id) {
+                // Resolve change_request safely. The new flat endpoint returns a
+                // string (or null/empty); the legacy Table API returned
+                // { value, display_value }. readField handles both, and crucially
+                // does NOT crash on null (typeof null === 'object').
+                const changeRequestValue = readField(sessionData, 'change_request');
+                const currentCrSysId = changeRequest && readField(changeRequest, 'sys_id');
+
+                if (changeRequestValue && changeRequestValue !== 'NULL' &&
+                    changeRequestValue !== currentCrSysId) {
                     try {
                         const crData = await service.getChangeRequest(changeRequestValue);
                         setChangeRequest(crData);
@@ -60,7 +63,7 @@ export default function SessionDashboard({ service, session, onError }) {
                     }
                 }
             }
-            
+
             setParticipants(participantsData || []);
         } catch (error) {
             onError('Failed to load session data: ' + error.message);
@@ -385,8 +388,8 @@ export default function SessionDashboard({ service, session, onError }) {
     };
 
     const renderParticipants = () => {
-        const onlineCount = participants.filter(p => String(p.is_online) === 'true').length;
-        const votedCount = participants.filter(p => String(p.has_voted) === 'true').length;
+        const onlineCount = participants.filter(p => p.is_online === true || String(p.is_online) === 'true').length;
+        const votedCount = participants.filter(p => p.has_voted === true || String(p.has_voted) === 'true').length;
         
         return (
             <div className="participants-panel">
@@ -398,14 +401,14 @@ export default function SessionDashboard({ service, session, onError }) {
                 </h3>
                 <div className="participants-list">
                     {participants.map(participant => {
-                        const userName = typeof participant.user === 'object' 
-                            ? participant.user.display_value 
-                            : participant.user;
-                        const isOnline = String(participant.is_online) === 'true';
-                        const hasVoted = String(participant.has_voted) === 'true';
-                        
+                        const userName = participant.user_display
+                            || (typeof participant.user === 'object' ? participant.user.display_value : participant.user);
+                        const isOnline = participant.is_online === true || String(participant.is_online) === 'true';
+                        const hasVoted = participant.has_voted === true || String(participant.has_voted) === 'true';
+                        const sysId = typeof participant.sys_id === 'object' ? participant.sys_id.value : participant.sys_id;
+
                         return (
-                            <div key={typeof participant.sys_id === 'object' ? participant.sys_id.value : participant.sys_id} className="participant-item">
+                            <div key={sysId} className="participant-item">
                                 <span className="participant-name">{userName}</span>
                                 <div className="participant-status">
                                     <span className={`status-indicator ${isOnline ? 'online' : 'offline'}`}>

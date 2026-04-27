@@ -59,6 +59,11 @@ export function updateChangeRequestFromSession(current, previous) {
     }
 
     try {
+        gs.info('CAB Poker BR: firing for session ' + sessionId +
+            ' (code=' + sessionCode + ', cr=' + changeRequestId +
+            ', risk=' + finalRisk + ', impact=' + finalImpact +
+            ', recommendation=' + finalRecommendation + ')');
+
         const crGr = new GlideRecord('change_request');
         if (!crGr.get(changeRequestId)) {
             gs.error('CAB Poker: Could not find change request ' + changeRequestId);
@@ -88,10 +93,19 @@ export function updateChangeRequestFromSession(current, previous) {
             '- Recommendation: ' + (RECOMMENDATION_LABELS[finalRecommendation] || finalRecommendation) + '\n\n' +
             'Vote Distribution:\n' + voteSummary;
 
-        crGr.setValue('work_notes', workNote);
-        crGr.update();
+        // Property assignment (not setValue) is the more reliable idiom for
+        // journal fields like work_notes when written from a cross-scope BR.
+        crGr.work_notes = workNote;
+        const updated = crGr.update();
 
-        gs.info('CAB Poker: Updated change request ' + changeRequestId + ' with session results');
+        if (updated) {
+            gs.info('CAB Poker BR: updated change request ' + changeRequestId +
+                ' with session results (work_notes length=' + workNote.length + ')');
+        } else {
+            gs.error('CAB Poker BR: crGr.update() returned falsy for ' + changeRequestId +
+                ' — likely cross-scope ACL or write-restricted state. Last error: ' +
+                (crGr.getLastErrorMessage ? crGr.getLastErrorMessage() : 'n/a'));
+        }
     } catch (e) {
         gs.error('CAB Poker: Error updating change request: ' + e.message);
     }

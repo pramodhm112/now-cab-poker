@@ -19,15 +19,18 @@ export default function MemberVoting({ service, session, sessionDetails, onError
     const [timeRemaining, setTimeRemaining] = useState(null);
 
     // Load change request whenever the session points to a (different) one.
+    // Use the scoped getSessionChangeRequest endpoint — members don't have
+    // platform-wide change_request read access, so the OOTB Table API would 404.
     useEffect(() => {
+        if (!session || !session.session_id) return;
         const changeRequestValue = readField(sessionDetails, 'change_request');
         if (changeRequestValue && changeRequestValue !== 'NULL' && changeRequestValue !== '' &&
             changeRequestValue !== (changeRequest && changeRequest.sys_id)) {
-            service.getChangeRequest(changeRequestValue)
-                .then(setChangeRequest)
+            service.getSessionChangeRequest(session.session_id)
+                .then(cr => { if (cr) setChangeRequest(cr); })
                 .catch(() => onError('Failed to load change request details'));
         }
-    }, [sessionDetails, service]);
+    }, [sessionDetails, service, session]);
 
     // Reset hasVoted whenever a new voting round starts (status -> 'voting' with a new start time).
     const sessionStatus = readField(sessionDetails, 'session_status');

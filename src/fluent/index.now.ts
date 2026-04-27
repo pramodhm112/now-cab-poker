@@ -21,3 +21,4 @@ export * from './business-rules/session-completion-br.now';
 
 // Sample Data
 export * from './records/sample-data.now';
+export * from './records/role-assignments.now';

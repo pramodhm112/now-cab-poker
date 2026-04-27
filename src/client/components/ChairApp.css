@@ -275,6 +275,36 @@
     color: #856404;
 }
 
+.finalize-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+    text-align: left;
+}
+
+.finalize-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-weight: 600;
+    color: #495057;
+}
+
+.finalize-grid select {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    background: white;
+    font-size: 0.95rem;
+}
+
+.finalize-grid select:focus {
+    outline: none;
+    border-color: #1f3864;
+    box-shadow: 0 0 0 2px rgba(31, 56, 100, 0.15);
+}
+
 /* Form styling */
 .form-group {
     margin-bottom: 1.5rem;

@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
 
+const readField = (rec, key) => {
+    if (!rec) return undefined;
+    const v = rec[key];
+    if (v && typeof v === 'object') return v.value !== undefined ? v.value : v.display_value;
+    return v;
+};
+
 export default function SessionDashboard({ service, session, onError }) {
     const [sessionDetails, setSessionDetails] = useState(null);
     const [participants, setParticipants] = useState([]);
@@ -8,10 +15,13 @@ export default function SessionDashboard({ service, session, onError }) {
     const [loading, setLoading] = useState(false);
     const [changeRequestId, setChangeRequestId] = useState('');
     const [showCRSelector, setShowCRSelector] = useState(false);
-    const [crSearchMode, setCrSearchMode] = useState('dropdown'); // 'sysid', 'number', or 'dropdown'
+    const [crSearchMode, setCrSearchMode] = useState('dropdown');
     const [changeRequestNumber, setChangeRequestNumber] = useState('');
     const [availableChangeRequests, setAvailableChangeRequests] = useState([]);
     const [selectedCrFromDropdown, setSelectedCrFromDropdown] = useState('');
+    const [finalRisk, setFinalRisk] = useState('');
+    const [finalImpact, setFinalImpact] = useState('');
+    const [finalRecommendation, setFinalRecommendation] = useState('');
 
     useEffect(() => {
         loadSessionData();
@@ -161,10 +171,45 @@ export default function SessionDashboard({ service, session, onError }) {
         try {
             const results = await service.revealVotes(session.session_id);
             setVotingResults(results);
+            // Pre-fill finalize controls with the most common vote in each category.
+            const votes = (results && results.votes) || [];
+            if (votes.length > 0) {
+                setFinalRisk(modeOf(votes.map(v => v.risk_vote)));
+                setFinalImpact(modeOf(votes.map(v => v.impact_vote)));
+                setFinalRecommendation(modeOf(votes.map(v => v.recommendation_vote)));
+            }
         } catch (error) {
             onError('Failed to reveal votes: ' + error.message);
         }
         setLoading(false);
+    };
+
+    const handleFinalize = async () => {
+        if (!finalRisk || !finalImpact || !finalRecommendation) {
+            onError('Set final risk, impact, and recommendation before finalizing');
+            return;
+        }
+        setLoading(true);
+        try {
+            await service.finalizeSession(session.session_id, finalRisk, parseInt(finalImpact, 10), finalRecommendation);
+            await loadSessionData();
+        } catch (error) {
+            onError('Failed to finalize session: ' + error.message);
+        }
+        setLoading(false);
+    };
+
+    const modeOf = (arr) => {
+        const counts = {};
+        let best = '';
+        let bestCount = 0;
+        for (let i = 0; i < arr.length; i++) {
+            const k = arr[i];
+            if (k === undefined || k === null || k === '') continue;
+            counts[k] = (counts[k] || 0) + 1;
+            if (counts[k] > bestCount) { best = k; bestCount = counts[k]; }
+        }
+        return String(best);
     };
 
     const getStatusDisplay = (status) => {
@@ -283,9 +328,56 @@ export default function SessionDashboard({ service, session, onError }) {
 
                 <div className="finalize-section">
                     <h4>Finalize Change Request</h4>
-                    <p>Review the voting results and update the change request with final decisions.</p>
-                    <button className="primary-button">
-                        Finalize & Update Change Request
+                    <p>Confirm or override the room's votes, then write the result back to the change request.</p>
+                    <div className="finalize-grid">
+                        <label>
+                            <span>Final Risk</span>
+                            <select
+                                value={finalRisk}
+                                onChange={(e) => setFinalRisk(e.target.value)}
+                                disabled={loading}
+                            >
+                                <option value="">-- select --</option>
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                                <option value="critical">Critical</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>Final Impact (1–5)</span>
+                            <select
+                                value={finalImpact}
+                                onChange={(e) => setFinalImpact(e.target.value)}
+                                disabled={loading}
+                            >
+                                <option value="">-- select --</option>
+                                {[1, 2, 3, 4, 5].map(n => (
+                                    <option key={n} value={n}>{n}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label>
+                            <span>Final Recommendation</span>
+                            <select
+                                value={finalRecommendation}
+                                onChange={(e) => setFinalRecommendation(e.target.value)}
+                                disabled={loading}
+                            >
+                                <option value="">-- select --</option>
+                                <option value="approve">Approve</option>
+                                <option value="approve_conditions">Approve with Conditions</option>
+                                <option value="reject">Reject</option>
+                                <option value="defer">Defer</option>
+                            </select>
+                        </label>
+                    </div>
+                    <button
+                        className="primary-button"
+                        onClick={handleFinalize}
+                        disabled={loading || !finalRisk || !finalImpact || !finalRecommendation}
+                    >
+                        {loading ? 'Finalizing...' : 'Finalize & Update Change Request'}
                     </button>
                 </div>
             </div>
@@ -576,13 +668,6 @@ export default function SessionDashboard({ service, session, onError }) {
                     )}
                 </div>
 
-                {/* Debugging Info */}
-                <div className="debug-panel" style={{ marginTop: '2rem', padding: '1rem', background: '#f8f9fa', borderRadius: '8px', fontSize: '0.9rem' }}>
-                    <h4>Debug Info:</h4>
-                    <p><strong>Session ID:</strong> {session.session_id}</p>
-                    <p><strong>Selected Change Request:</strong> {changeRequest ? (typeof changeRequest.sys_id === 'object' ? changeRequest.sys_id.value : changeRequest.sys_id) : 'None'}</p>
-                    <p><strong>Session Status:</strong> {sessionStatus}</p>
-                </div>
             </div>
         </div>
     );

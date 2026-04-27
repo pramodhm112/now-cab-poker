@@ -1,21 +1,12 @@
 import '@servicenow/sdk/global'
 import { Record } from '@servicenow/sdk/core'
 
-// Sample CAB session for testing - will need chair_user set after creation
-export const sampleSession = Record({
-    $id: Now.ID['sample-session'],
-    table: 'x_1862662_cab_poke_session',
-    data: {
-        session_code: 'DEMO01',
-        chair_user: 'admin', // Using admin user as default
-        session_status: 'waiting',
-        voting_timer: 30,
-        active: true
-    },
-    $meta: {
-        installMethod: 'demo'
-    }
-})
+// NOTE: A seeded "sample session" is intentionally NOT shipped here.
+// Reference columns (chair_user -> sys_user) cannot be populated by username — they
+// require a sys_id or a Now.ID reference, and the OOTB admin user's sys_id is not
+// portable across instances. Sessions are created at runtime via the createSession
+// REST endpoint, which sets chair_user from gs.getUserID(). Sample users and change
+// requests below are for demo purposes only and are tagged installMethod 'demo'.
 
 // Sample Test Users for CAB Poker - Updated with unique usernames
 export const testUser1 = Record({

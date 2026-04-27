@@ -12,39 +12,25 @@ export default function MemberApp() {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        if (currentSession) {
-            // Since Table API lookup is failing, let's use the session data we got from joining
-            // and only try to refresh it periodically using a different method
-            setSessionDetails({
-                session_status: { value: 'waiting' },
-                session_code: { value: currentSession.session_code },
-                voting_timer: { value: 30 }
-            });
-            
-            // Try to load additional session data less frequently and handle failures gracefully
-            const interval = setInterval(() => {
-                loadSessionDataSafely();
-            }, 5000); // Every 5 seconds instead of 2
-            
-            return () => clearInterval(interval);
-        }
-    }, [currentSession]);
-
-    const loadSessionDataSafely = async () => {
-        if (!currentSession) return;
-        
-        try {
-            // Try to get session details, but don't fail if it doesn't work
-            const sessionData = await service.getSessionSafely(currentSession.session_id);
-            if (sessionData) {
-                setSessionDetails(sessionData);
+        if (!currentSession) return undefined;
+        // Seed initial details so the UI can render immediately after join.
+        setSessionDetails({
+            session_status: { value: 'waiting' },
+            session_code: { value: currentSession.session_code },
+            voting_timer: { value: 30 }
+        });
+        // Polling is the fallback for environments where AMB record-watcher
+        // cannot be subscribed from the BYOUI page (see CabPokerService.subscribeToSession).
+        const interval = setInterval(async () => {
+            try {
+                const sessionData = await service.getSessionSafely(currentSession.session_id);
+                if (sessionData) setSessionDetails(sessionData);
+            } catch (e) {
+                console.warn('Could not refresh session data:', e.message);
             }
-        } catch (error) {
-            // Silently fail for session data loading after the initial join
-            console.warn('Could not refresh session data:', error.message);
-            // Don't show error to user since they can still participate
-        }
-    };
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [currentSession, service]);
 
     const handleSessionJoined = (session) => {
         console.log('Session joined successfully:', session);

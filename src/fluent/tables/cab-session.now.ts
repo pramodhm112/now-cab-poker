@@ -33,14 +33,14 @@ export const x_1862662_cab_poke_session = Table({
         }),
         voting_timer: IntegerColumn({
             label: 'Voting Timer (seconds)',
-            default: '30',
+            default: 30,
         }),
         voting_start_time: DateTimeColumn({
             label: 'Voting Start Time',
         }),
         active: BooleanColumn({
             label: 'Active',
-            default: 'true',
+            default: true,
         }),
         final_risk: StringColumn({
             label: 'Final Risk Assessment',

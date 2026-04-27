@@ -2,6 +2,7 @@
 export * from './tables/cab-session.now';
 export * from './tables/cab-participant.now';
 export * from './tables/cab-vote.now';
+export * from './tables/cab-vote-audit.now';
 
 // Roles
 export * from './roles/cab-poker-roles.now';

@@ -302,6 +302,29 @@ export class CabPokerService {
         }
     }
 
+    async finalizeSession(sessionId, finalRisk, finalImpact, finalRecommendation) {
+        const response = await fetch(`${this.baseUrl}/session/${sessionId}/finalize`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-UserToken': window.g_ck || ''
+            },
+            body: JSON.stringify({
+                final_risk: finalRisk,
+                final_impact: finalImpact,
+                final_recommendation: finalRecommendation
+            })
+        });
+        const text = await response.text();
+        if (!response.ok) {
+            let msg = `HTTP ${response.status}: ${response.statusText}`;
+            try { msg = (JSON.parse(text).error) || msg; } catch (_) { msg = text || msg; }
+            throw new Error(msg);
+        }
+        return text ? JSON.parse(text) : {};
+    }
+
     async revealVotes(sessionId) {
         try {
             const response = await fetch(`${this.baseUrl}/session/${sessionId}/reveal`, {

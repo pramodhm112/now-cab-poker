@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
 
+const readField = (rec, key) => {
+    if (!rec) return undefined;
+    const v = rec[key];
+    if (v && typeof v === 'object') return v.value !== undefined ? v.value : v.display_value;
+    return v;
+};
+
 export default function MemberVoting({ service, session, sessionDetails, onError, onVoteSubmitted }) {
     const [votes, setVotes] = useState({
         risk: '',
@@ -11,56 +18,51 @@ export default function MemberVoting({ service, session, sessionDetails, onError
     const [changeRequest, setChangeRequest] = useState(null);
     const [timeRemaining, setTimeRemaining] = useState(null);
 
+    // Load change request whenever the session points to a (different) one.
     useEffect(() => {
-        if (sessionDetails) {
-            // Load change request if one is selected
-            const changeRequestValue = typeof sessionDetails.change_request === 'object' 
-                ? sessionDetails.change_request.value 
-                : sessionDetails.change_request;
-                
-            if (changeRequestValue && changeRequestValue !== 'NULL' && changeRequestValue !== changeRequest?.sys_id) {
-                loadChangeRequest(changeRequestValue);
-            }
-
-            // Check if voting is active and set up timer
-            const sessionStatus = typeof sessionDetails.session_status === 'object' 
-                ? sessionDetails.session_status.value 
-                : sessionDetails.session_status;
-
-            if (sessionStatus === 'voting') {
-                startVotingTimer();
-            }
+        const changeRequestValue = readField(sessionDetails, 'change_request');
+        if (changeRequestValue && changeRequestValue !== 'NULL' && changeRequestValue !== '' &&
+            changeRequestValue !== (changeRequest && changeRequest.sys_id)) {
+            service.getChangeRequest(changeRequestValue)
+                .then(setChangeRequest)
+                .catch(() => onError('Failed to load change request details'));
         }
-    }, [sessionDetails]);
+    }, [sessionDetails, service]);
 
-    const loadChangeRequest = async (changeRequestId) => {
-        try {
-            const crData = await service.getChangeRequest(changeRequestId);
-            setChangeRequest(crData);
-        } catch (error) {
-            onError('Failed to load change request details');
+    // Reset hasVoted whenever a new voting round starts (status -> 'voting' with a new start time).
+    const sessionStatus = readField(sessionDetails, 'session_status');
+    const votingStartTime = readField(sessionDetails, 'voting_start_time');
+    useEffect(() => {
+        if (sessionStatus === 'voting') {
+            setHasVoted(false);
+            setVotes({ risk: '', impact: '', recommendation: '' });
         }
-    };
+    }, [sessionStatus, votingStartTime]);
 
-    const startVotingTimer = () => {
-        const votingTimer = typeof sessionDetails.voting_timer === 'object'
-            ? parseInt(sessionDetails.voting_timer.value)
-            : parseInt(sessionDetails.voting_timer);
-        
-        setTimeRemaining(votingTimer);
-        
+    // Run the countdown timer while voting is active. Cleanup is owned by useEffect.
+    useEffect(() => {
+        if (sessionStatus !== 'voting') {
+            setTimeRemaining(null);
+            return undefined;
+        }
+        const total = parseInt(readField(sessionDetails, 'voting_timer'), 10) || 30;
+        let remaining = total;
+        if (votingStartTime) {
+            const elapsed = Math.floor((Date.now() - new Date(votingStartTime).getTime()) / 1000);
+            remaining = Math.max(0, total - elapsed);
+        }
+        setTimeRemaining(remaining);
         const timer = setInterval(() => {
             setTimeRemaining(prev => {
-                if (prev <= 1) {
+                if (prev === null || prev <= 1) {
                     clearInterval(timer);
                     return 0;
                 }
                 return prev - 1;
             });
         }, 1000);
-
         return () => clearInterval(timer);
-    };
+    }, [sessionStatus, votingStartTime, sessionDetails]);
 
     const handleVoteChange = (category, value) => {
         setVotes(prev => ({
@@ -78,9 +80,9 @@ export default function MemberVoting({ service, session, sessionDetails, onError
         setLoading(true);
         try {
             await service.submitVote(
-                session.session_id, 
-                votes.risk, 
-                votes.impact, 
+                session.session_id,
+                votes.risk,
+                parseInt(votes.impact, 10),
                 votes.recommendation
             );
             setHasVoted(true);
@@ -93,51 +95,27 @@ export default function MemberVoting({ service, session, sessionDetails, onError
 
     const getStatusDisplay = () => {
         if (!sessionDetails) return 'Loading...';
-        
-        const status = typeof sessionDetails.session_status === 'object' 
-            ? sessionDetails.session_status.value 
-            : sessionDetails.session_status;
-
-        switch (status) {
+        switch (sessionStatus) {
             case 'waiting': return 'Waiting for CAB Chair to start voting';
             case 'voting': return 'Voting in Progress';
             case 'revealing': return 'Votes Revealed - Session Complete';
             case 'completed': return 'Session Completed';
-            default: return status;
+            default: return sessionStatus;
         }
     };
 
     const getStatusClass = () => {
         if (!sessionDetails) return 'status-loading';
-        
-        const status = typeof sessionDetails.session_status === 'object' 
-            ? sessionDetails.session_status.value 
-            : sessionDetails.session_status;
-
-        return `status-badge status-${status}`;
+        return `status-badge status-${sessionStatus}`;
     };
 
-    const isVotingActive = () => {
-        if (!sessionDetails) return false;
-        const status = typeof sessionDetails.session_status === 'object' 
-            ? sessionDetails.session_status.value 
-            : sessionDetails.session_status;
-        return status === 'voting';
-    };
+    const isVotingActive = () => sessionStatus === 'voting';
 
     const renderChangeRequest = () => {
         if (!changeRequest) return null;
-        
-        const crNumber = typeof changeRequest.number === 'object' 
-            ? changeRequest.number.display_value 
-            : changeRequest.number;
-        const shortDescription = typeof changeRequest.short_description === 'object' 
-            ? changeRequest.short_description.display_value 
-            : changeRequest.short_description;
-        const description = typeof changeRequest.description === 'object' 
-            ? changeRequest.description.display_value 
-            : changeRequest.description;
-            
+        const crNumber = readField(changeRequest, 'number');
+        const shortDescription = readField(changeRequest, 'short_description');
+        const description = readField(changeRequest, 'description');
         return (
             <div className="change-request-card">
                 <h3>Change Request Under Review</h3>

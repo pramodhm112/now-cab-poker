@@ -23,11 +23,11 @@ export const x_1862662_cab_poke_participant = Table({
         }),
         is_online: BooleanColumn({
             label: 'Online Status',
-            default: 'true',
+            default: true,
         }),
         has_voted: BooleanColumn({
             label: 'Has Voted',
-            default: 'false',
+            default: false,
         }),
     },
     actions: ['create', 'read', 'update', 'delete'],

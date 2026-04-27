@@ -108,3 +108,27 @@ export const cabVoteUpdateAcl = Acl({
     roles: ['x_1862662_cab_poke.cab_poker_chair', 'x_1862662_cab_poke.cab_poker_member'],
     description: 'Allow CAB Poker users to update vote records'
 })
+
+// ACL for CAB Vote Audit - Read access (chair only; members shouldn't browse audit log)
+export const cabVoteAuditReadAcl = Acl({
+    $id: Now.ID['cab-vote-audit-read-acl'],
+    type: 'record',
+    table: 'x_1862662_cab_poke_vote_audit',
+    operation: 'read',
+    active: true,
+    admin_overrides: true,
+    roles: ['x_1862662_cab_poke.cab_poker_chair'],
+    description: 'Allow CAB Chairs to read audit records'
+})
+
+// ACL for CAB Vote Audit - Create access (server-side handlers run as the user, so both roles need create)
+export const cabVoteAuditCreateAcl = Acl({
+    $id: Now.ID['cab-vote-audit-create-acl'],
+    type: 'record',
+    table: 'x_1862662_cab_poke_vote_audit',
+    operation: 'create',
+    active: true,
+    admin_overrides: true,
+    roles: ['x_1862662_cab_poke.cab_poker_chair', 'x_1862662_cab_poke.cab_poker_member'],
+    description: 'Allow CAB Poker users to create audit records'
+})

@@ -1,171 +1,108 @@
 import { gs, GlideRecord, GlideDateTime } from '@servicenow/glide'
 
-// Helper function to safely convert to string
-function safeToString(value) {
-    if (value === null || value === undefined) {
-        return '';
-    }
-    if (typeof value === 'string') {
-        return value;
-    }
-    if (typeof value === 'object') {
-        try {
-            return JSON.stringify(value);
-        } catch (e) {
-            return String(value);
-        }
-    }
-    return String(value);
-}
+const VALID_RISK_VOTES = { low: true, medium: true, high: true, critical: true };
+const VALID_RECOMMENDATION_VOTES = { approve: true, approve_conditions: true, reject: true, defer: true };
 
-// Helper function to read request body using ServiceNow-specific methods
+// Canonical Scripted REST API body access: request.body.data is the parsed JSON.
+// Fall back to dataString (raw) and queryParams for compatibility with non-JSON callers.
 function readRequestBody(request) {
-    gs.info('CAB Poker - readRequestBody: Starting ServiceNow-specific body reading');
-    
-    let body = {};
-    let found = false;
-    
+    if (!request) return {};
     try {
-        // ServiceNow Scripted REST API body access
         if (request.body) {
-            gs.info('CAB Poker - Request body exists, type: ' + typeof request.body);
-            
-            // Method 1: Direct property access (ServiceNow often parses JSON automatically)
-            if (request.body.change_request_id) {
-                body.change_request_id = request.body.change_request_id;
-                found = true;
-                gs.info('CAB Poker - Found change_request_id directly in body: ' + body.change_request_id);
+            if (request.body.data && typeof request.body.data === 'object') {
+                return request.body.data;
             }
-            else if (request.body.risk_vote || request.body.impact_vote || request.body.recommendation_vote) {
-                body = {
-                    risk_vote: request.body.risk_vote,
-                    impact_vote: request.body.impact_vote,
-                    recommendation_vote: request.body.recommendation_vote
-                };
-                found = true;
-                gs.info('CAB Poker - Found vote data directly in body');
-            }
-            // Method 2: Try data property
-            else if (request.body.data && typeof request.body.data === 'object') {
-                body = request.body.data;
-                found = true;
-                gs.info('CAB Poker - Using body.data object: ' + JSON.stringify(body));
-            }
-            // Method 3: Try parsing dataString
-            else if (request.body.dataString) {
+            if (typeof request.body.dataString === 'string' && request.body.dataString.length > 0) {
                 try {
-                    if (typeof request.body.dataString === 'object') {
-                        body = request.body.dataString;
-                    } else {
-                        body = JSON.parse(request.body.dataString);
-                    }
-                    found = true;
-                    gs.info('CAB Poker - Parsed dataString: ' + JSON.stringify(body));
+                    return JSON.parse(request.body.dataString);
                 } catch (e) {
-                    gs.error('CAB Poker - Failed to parse dataString: ' + e.message);
-                }
-            }
-            // Method 4: Try parsing body as string
-            else if (typeof request.body === 'string') {
-                try {
-                    body = JSON.parse(request.body);
-                    found = true;
-                    gs.info('CAB Poker - Parsed string body: ' + JSON.stringify(body));
-                } catch (e) {
-                    gs.error('CAB Poker - Failed to parse string body: ' + e.message);
+                    gs.warn('CAB Poker - Could not parse dataString as JSON: ' + e.message);
                 }
             }
         }
-        
-        // Fallback to query parameters
-        if (!found && request.queryParams) {
-            gs.info('CAB Poker - Checking query parameters as fallback');
-            const queryKeys = Object.keys(request.queryParams);
-            gs.info('CAB Poker - Available query parameters: ' + queryKeys.join(', '));
-            
-            // Map query parameters to body
-            if (request.queryParams.change_request_id) {
-                body.change_request_id = request.queryParams.change_request_id;
-                found = true;
+        if (request.queryParams) {
+            const out = {};
+            const keys = Object.keys(request.queryParams);
+            for (let i = 0; i < keys.length; i++) {
+                const v = request.queryParams[keys[i]];
+                out[keys[i]] = Array.isArray(v) ? v[0] : v;
             }
-            if (request.queryParams.risk_vote) {
-                body.risk_vote = request.queryParams.risk_vote;
-                body.impact_vote = request.queryParams.impact_vote;
-                body.recommendation_vote = request.queryParams.recommendation_vote;
-                found = true;
-            }
+            return out;
         }
-        
     } catch (e) {
         gs.error('CAB Poker - Exception in readRequestBody: ' + e.message);
     }
-    
-    gs.info('CAB Poker - Body extraction final result - Found: ' + found + ', Body: ' + JSON.stringify(body));
-    return body;
+    return {};
+}
+
+function sendJson(response, status, body) {
+    response.setStatus(status);
+    response.setContentType('application/json');
+    response.getStreamWriter().writeString(JSON.stringify(body));
+}
+
+function logVoteEvent(sessionId, userId, action, details) {
+    try {
+        const auditGr = new GlideRecord('x_1862662_cab_poke_vote_audit');
+        if (!auditGr.isValid()) return;
+        auditGr.initialize();
+        auditGr.setValue('session', sessionId);
+        auditGr.setValue('user', userId);
+        auditGr.setValue('action', action);
+        auditGr.setValue('event_time', new GlideDateTime());
+        if (details) {
+            auditGr.setValue('details', JSON.stringify(details));
+        }
+        auditGr.insert();
+    } catch (e) {
+        gs.warn('CAB Poker - Audit log failed: ' + e.message);
+    }
 }
 
 // Start voting for a change request
 export function startVoting(request, response) {
     try {
-        gs.info('CAB Poker - Start Voting: Processing request');
-        const sessionId = request.pathParams.session_id;
-        gs.info('CAB Poker - Session ID from path: ' + sessionId);
-        
+        const sessionId = request.pathParams && request.pathParams.session_id;
         const body = readRequestBody(request);
         const changeRequestId = body.change_request_id;
-        
-        gs.info('CAB Poker - Change request ID extracted: ' + changeRequestId);
-        
-        if (!changeRequestId || changeRequestId.trim() === '') {
-            gs.error('CAB Poker - No change request ID provided');
-            response.setStatus(400);
-            response.setContentType('application/json');
-            response.getStreamWriter().writeString(JSON.stringify({
-                error: 'Change request ID is required to start voting'
-            }));
-            return;
+
+        if (!sessionId) {
+            return sendJson(response, 400, { error: 'session_id path parameter is required' });
         }
-        
+        if (!changeRequestId || String(changeRequestId).trim() === '') {
+            return sendJson(response, 400, { error: 'Change request ID is required to start voting' });
+        }
+
         const userId = gs.getUserID();
-        
-        // Verify user is the chair of this session
+        if (!userId) {
+            return sendJson(response, 401, { error: 'Authentication required' });
+        }
+
         const sessionGr = new GlideRecord('x_1862662_cab_poke_session');
         if (!sessionGr.get(sessionId)) {
-            response.setStatus(404);
-            response.setContentType('application/json');
-            response.getStreamWriter().writeString(JSON.stringify({
-                error: 'Session not found'
-            }));
-            return;
+            return sendJson(response, 404, { error: 'Session not found' });
         }
-        
         if (sessionGr.getValue('chair_user') !== userId) {
-            response.setStatus(403);
-            response.setContentType('application/json');
-            response.getStreamWriter().writeString(JSON.stringify({
-                error: 'Only the session chair can start voting'
-            }));
-            return;
+            return sendJson(response, 403, { error: 'Only the session chair can start voting' });
         }
-        
-        // Validate change request exists
+
+        const cleanCrId = String(changeRequestId).trim();
         const crGr = new GlideRecord('change_request');
-        if (!crGr.get(changeRequestId.trim())) {
-            response.setStatus(404);
-            response.setContentType('application/json');
-            response.getStreamWriter().writeString(JSON.stringify({
-                error: 'Change request not found: ' + changeRequestId
-            }));
-            return;
+        if (!crGr.get(cleanCrId)) {
+            return sendJson(response, 404, { error: 'Change request not found: ' + cleanCrId });
         }
-        
-        // Update session with change request and start voting
-        sessionGr.setValue('change_request', changeRequestId.trim());
+
+        // Clear any prior votes on this session so a re-start gives a clean slate.
+        const oldVotes = new GlideRecord('x_1862662_cab_poke_vote');
+        oldVotes.addQuery('session', sessionId);
+        oldVotes.query();
+        oldVotes.deleteMultiple();
+
+        sessionGr.setValue('change_request', cleanCrId);
         sessionGr.setValue('session_status', 'voting');
         sessionGr.setValue('voting_start_time', new GlideDateTime());
         sessionGr.update();
-        
-        // Reset participant vote status
+
         const participantGr = new GlideRecord('x_1862662_cab_poke_participant');
         participantGr.addQuery('session', sessionId);
         participantGr.query();
@@ -173,93 +110,91 @@ export function startVoting(request, response) {
             participantGr.setValue('has_voted', false);
             participantGr.update();
         }
-        
-        response.setStatus(200);
-        response.setContentType('application/json');
-        response.getStreamWriter().writeString(JSON.stringify({
+
+        logVoteEvent(sessionId, userId, 'start_voting', { change_request: cleanCrId });
+
+        sendJson(response, 200, {
             status: 'voting_started',
             voting_start_time: sessionGr.getValue('voting_start_time'),
             voting_timer: sessionGr.getValue('voting_timer'),
-            change_request_id: changeRequestId.trim()
-        }));
-        
+            change_request_id: cleanCrId
+        });
     } catch (e) {
         gs.error('CAB Poker - Start Voting Error: ' + e.message);
-        response.setStatus(500);
-        response.setContentType('application/json');
-        response.getStreamWriter().writeString(JSON.stringify({
-            error: 'Internal server error: ' + e.message
-        }));
+        sendJson(response, 500, { error: 'Internal server error: ' + e.message });
     }
 }
 
 // Submit a vote
 export function submitVote(request, response) {
     try {
-        gs.info('CAB Poker - Submit Vote: Processing request');
-        const sessionId = request.pathParams.session_id;
-        
+        const sessionId = request.pathParams && request.pathParams.session_id;
         const body = readRequestBody(request);
-        gs.info('CAB Poker - Vote data extracted: ' + JSON.stringify(body));
-        
-        if (!body.risk_vote || !body.impact_vote || !body.recommendation_vote) {
-            response.setStatus(400);
-            response.setContentType('application/json');
-            response.getStreamWriter().writeString(JSON.stringify({
-                error: 'All vote fields (risk, impact, recommendation) are required'
-            }));
-            return;
+
+        if (!sessionId) {
+            return sendJson(response, 400, { error: 'session_id path parameter is required' });
         }
-        
+
+        const riskVote = body.risk_vote;
+        const impactVoteRaw = body.impact_vote;
+        const recommendationVote = body.recommendation_vote;
+
+        if (!riskVote || !impactVoteRaw || !recommendationVote) {
+            return sendJson(response, 400, { error: 'All vote fields (risk, impact, recommendation) are required' });
+        }
+        if (!VALID_RISK_VOTES.hasOwnProperty(riskVote)) {
+            return sendJson(response, 400, { error: 'Invalid risk vote: ' + riskVote });
+        }
+        if (!VALID_RECOMMENDATION_VOTES.hasOwnProperty(recommendationVote)) {
+            return sendJson(response, 400, { error: 'Invalid recommendation vote: ' + recommendationVote });
+        }
+        const impactVote = parseInt(impactVoteRaw, 10);
+        if (!(impactVote >= 1 && impactVote <= 5)) {
+            return sendJson(response, 400, { error: 'Invalid impact vote (must be 1..5): ' + impactVoteRaw });
+        }
+
         const userId = gs.getUserID();
-        
-        // Verify session is in voting state
+        if (!userId) {
+            return sendJson(response, 401, { error: 'Authentication required' });
+        }
+
         const sessionGr = new GlideRecord('x_1862662_cab_poke_session');
         if (!sessionGr.get(sessionId)) {
-            response.setStatus(404);
-            response.setContentType('application/json');
-            response.getStreamWriter().writeString(JSON.stringify({
-                error: 'Session not found'
-            }));
-            return;
+            return sendJson(response, 404, { error: 'Session not found' });
         }
-        
         if (sessionGr.getValue('session_status') !== 'voting') {
-            response.setStatus(400);
-            response.setContentType('application/json');
-            response.getStreamWriter().writeString(JSON.stringify({
-                error: 'Session is not in voting state'
-            }));
-            return;
+            return sendJson(response, 400, { error: 'Session is not in voting state' });
         }
-        
-        // Get participant record
+
+        // Server-side voting-window enforcement so a slow client cannot vote past the timer.
+        const startTimeStr = sessionGr.getValue('voting_start_time');
+        const timerSeconds = parseInt(sessionGr.getValue('voting_timer'), 10) || 30;
+        if (startTimeStr) {
+            const startGdt = new GlideDateTime(startTimeStr);
+            const elapsed = (new GlideDateTime()).getNumericValue() - startGdt.getNumericValue();
+            // Allow a 2-second grace for network latency.
+            if (elapsed > (timerSeconds + 2) * 1000) {
+                return sendJson(response, 400, { error: 'Voting window has closed' });
+            }
+        }
+
         const participantGr = new GlideRecord('x_1862662_cab_poke_participant');
         participantGr.addQuery('session', sessionId);
         participantGr.addQuery('user', userId);
         participantGr.query();
-        
-        if (!participantGr.hasNext()) {
-            response.setStatus(403);
-            response.setContentType('application/json');
-            response.getStreamWriter().writeString(JSON.stringify({
-                error: 'User is not a participant in this session'
-            }));
-            return;
+        if (!participantGr.next()) {
+            return sendJson(response, 403, { error: 'User is not a participant in this session' });
         }
-        
-        participantGr.next();
         const participantId = participantGr.getUniqueValue();
-        
-        // Check if user already voted, update existing vote or create new one
+
         const existingVote = new GlideRecord('x_1862662_cab_poke_vote');
         existingVote.addQuery('session', sessionId);
         existingVote.addQuery('user', userId);
         existingVote.query();
-        
+        const hasExisting = existingVote.next();
+
         let voteGr;
-        if (existingVote.hasNext()) {
-            existingVote.next();
+        if (hasExisting) {
             voteGr = existingVote;
         } else {
             voteGr = new GlideRecord('x_1862662_cab_poke_vote');
@@ -268,76 +203,63 @@ export function submitVote(request, response) {
             voteGr.setValue('participant', participantId);
             voteGr.setValue('user', userId);
         }
-        
-        voteGr.setValue('risk_vote', body.risk_vote);
-        voteGr.setValue('impact_vote', body.impact_vote);
-        voteGr.setValue('recommendation_vote', body.recommendation_vote);
+
+        voteGr.setValue('risk_vote', riskVote);
+        voteGr.setValue('impact_vote', impactVote);
+        voteGr.setValue('recommendation_vote', recommendationVote);
         voteGr.setValue('vote_time', new GlideDateTime());
-        
-        if (existingVote.hasNext()) {
+
+        if (hasExisting) {
             voteGr.update();
         } else {
             voteGr.insert();
         }
-        
-        // Update participant voted status
+
         participantGr.setValue('has_voted', true);
         participantGr.setValue('last_activity', new GlideDateTime());
         participantGr.update();
-        
-        response.setStatus(200);
-        response.setContentType('application/json');
-        response.getStreamWriter().writeString(JSON.stringify({
-            status: 'vote_submitted'
-        }));
-        
+
+        logVoteEvent(sessionId, userId, hasExisting ? 'update_vote' : 'submit_vote', {
+            risk: riskVote,
+            impact: impactVote,
+            recommendation: recommendationVote
+        });
+
+        sendJson(response, 200, { status: 'vote_submitted' });
     } catch (e) {
         gs.error('CAB Poker - Submit Vote Error: ' + e.message);
-        response.setStatus(500);
-        response.setContentType('application/json');
-        response.getStreamWriter().writeString(JSON.stringify({
-            error: 'Internal server error: ' + e.message
-        }));
+        sendJson(response, 500, { error: 'Internal server error: ' + e.message });
     }
 }
 
 // Reveal votes (chair only)
 export function revealVotes(request, response) {
     try {
-        gs.info('CAB Poker - Reveal Votes: Processing request');
-        const sessionId = request.pathParams.session_id;
+        const sessionId = request.pathParams && request.pathParams.session_id;
         const userId = gs.getUserID();
-        
-        // Verify user is the chair
+
+        if (!sessionId) {
+            return sendJson(response, 400, { error: 'session_id path parameter is required' });
+        }
+        if (!userId) {
+            return sendJson(response, 401, { error: 'Authentication required' });
+        }
+
         const sessionGr = new GlideRecord('x_1862662_cab_poke_session');
         if (!sessionGr.get(sessionId)) {
-            response.setStatus(404);
-            response.setContentType('application/json');
-            response.getStreamWriter().writeString(JSON.stringify({
-                error: 'Session not found'
-            }));
-            return;
+            return sendJson(response, 404, { error: 'Session not found' });
         }
-        
         if (sessionGr.getValue('chair_user') !== userId) {
-            response.setStatus(403);
-            response.setContentType('application/json');
-            response.getStreamWriter().writeString(JSON.stringify({
-                error: 'Only the session chair can reveal votes'
-            }));
-            return;
+            return sendJson(response, 403, { error: 'Only the session chair can reveal votes' });
         }
-        
-        // Update session status
+
         sessionGr.setValue('session_status', 'revealing');
         sessionGr.update();
-        
-        // Get all votes for this session
+
         const votes = [];
         const voteGr = new GlideRecord('x_1862662_cab_poke_vote');
         voteGr.addQuery('session', sessionId);
         voteGr.query();
-        
         while (voteGr.next()) {
             votes.push({
                 user: voteGr.getDisplayValue('user'),
@@ -347,20 +269,78 @@ export function revealVotes(request, response) {
                 vote_time: voteGr.getValue('vote_time')
             });
         }
-        
-        response.setStatus(200);
-        response.setContentType('application/json');
-        response.getStreamWriter().writeString(JSON.stringify({
-            status: 'votes_revealed',
-            votes: votes
-        }));
-        
+
+        logVoteEvent(sessionId, userId, 'reveal_votes', { vote_count: votes.length });
+
+        sendJson(response, 200, { status: 'votes_revealed', votes: votes });
     } catch (e) {
         gs.error('CAB Poker - Reveal Votes Error: ' + e.message);
-        response.setStatus(500);
-        response.setContentType('application/json');
-        response.getStreamWriter().writeString(JSON.stringify({
-            error: 'Internal server error: ' + e.message
-        }));
+        sendJson(response, 500, { error: 'Internal server error: ' + e.message });
+    }
+}
+
+// Finalize a session: chair sets final risk/impact/recommendation, server marks
+// session completed. The session-completion business rule then writes back to change_request.
+export function finalizeSession(request, response) {
+    try {
+        const sessionId = request.pathParams && request.pathParams.session_id;
+        const body = readRequestBody(request);
+        const userId = gs.getUserID();
+
+        if (!sessionId) {
+            return sendJson(response, 400, { error: 'session_id path parameter is required' });
+        }
+        if (!userId) {
+            return sendJson(response, 401, { error: 'Authentication required' });
+        }
+
+        const finalRisk = body.final_risk;
+        const finalImpactRaw = body.final_impact;
+        const finalRecommendation = body.final_recommendation;
+
+        if (!finalRisk || !finalImpactRaw || !finalRecommendation) {
+            return sendJson(response, 400, { error: 'final_risk, final_impact, and final_recommendation are required' });
+        }
+        if (!VALID_RISK_VOTES.hasOwnProperty(finalRisk)) {
+            return sendJson(response, 400, { error: 'Invalid final_risk: ' + finalRisk });
+        }
+        if (!VALID_RECOMMENDATION_VOTES.hasOwnProperty(finalRecommendation)) {
+            return sendJson(response, 400, { error: 'Invalid final_recommendation: ' + finalRecommendation });
+        }
+        const finalImpact = parseInt(finalImpactRaw, 10);
+        if (!(finalImpact >= 1 && finalImpact <= 5)) {
+            return sendJson(response, 400, { error: 'Invalid final_impact (must be 1..5): ' + finalImpactRaw });
+        }
+
+        const sessionGr = new GlideRecord('x_1862662_cab_poke_session');
+        if (!sessionGr.get(sessionId)) {
+            return sendJson(response, 404, { error: 'Session not found' });
+        }
+        if (sessionGr.getValue('chair_user') !== userId) {
+            return sendJson(response, 403, { error: 'Only the session chair can finalize' });
+        }
+
+        sessionGr.setValue('final_risk', finalRisk);
+        sessionGr.setValue('final_impact', finalImpact);
+        sessionGr.setValue('final_recommendation', finalRecommendation);
+        sessionGr.setValue('session_status', 'completed');
+        sessionGr.setValue('active', false);
+        sessionGr.update();
+
+        logVoteEvent(sessionId, userId, 'finalize', {
+            risk: finalRisk,
+            impact: finalImpact,
+            recommendation: finalRecommendation
+        });
+
+        sendJson(response, 200, {
+            status: 'finalized',
+            final_risk: finalRisk,
+            final_impact: finalImpact,
+            final_recommendation: finalRecommendation
+        });
+    } catch (e) {
+        gs.error('CAB Poker - Finalize Session Error: ' + e.message);
+        sendJson(response, 500, { error: 'Internal server error: ' + e.message });
     }
 }

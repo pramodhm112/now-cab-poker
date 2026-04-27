@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { RestApi } from '@servicenow/sdk/core'
-import { createSession, joinSession, joinSessionAlternative, testRequestBody } from '../../server/rest-handlers/session-handlers.js'
-import { startVoting, submitVote, revealVotes } from '../../server/rest-handlers/voting-handlers.js'
+import { createSession, joinSession, joinSessionAlternative } from '../../server/rest-handlers/session-handlers.js'
+import { startVoting, submitVote, revealVotes, finalizeSession } from '../../server/rest-handlers/voting-handlers.js'
 
 export const cabPokerApi = RestApi({
     $id: Now.ID['cab-poker-api'],
@@ -11,16 +11,6 @@ export const cabPokerApi = RestApi({
     active: true,
     enforce_acl: [],
     routes: [
-        {
-            $id: Now.ID['test-body'],
-            name: 'Test Request Body',
-            path: '/test',
-            method: 'POST',
-            script: testRequestBody,
-            short_description: 'Debug endpoint to test request body handling',
-            authentication: true,
-            authorization: true,
-        },
         {
             $id: Now.ID['create-session'],
             name: 'Create Session',
@@ -78,6 +68,16 @@ export const cabPokerApi = RestApi({
             method: 'POST',
             script: revealVotes,
             short_description: 'Reveal all votes for the session (chair only)',
+            authentication: true,
+            authorization: true,
+        },
+        {
+            $id: Now.ID['finalize-session'],
+            name: 'Finalize Session',
+            path: '/session/{session_id}/finalize',
+            method: 'POST',
+            script: finalizeSession,
+            short_description: 'Chair sets final risk/impact/recommendation and completes the session',
             authentication: true,
             authorization: true,
         },

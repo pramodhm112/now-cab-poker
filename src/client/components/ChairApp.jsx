@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { CabPokerService } from '../services/CabPokerService.js';
 import SessionCreator from './SessionCreator.jsx';
 import SessionDashboard from './SessionDashboard.jsx';

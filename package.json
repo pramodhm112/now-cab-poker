@@ -1,0 +1,22 @@
+{
+    "name": "x-1862662-cab-poker",
+    "version": "1.0.0",
+    "description": "[BUILD AGENT GENERATED]:  Interactive voting tool for Change Advisory Board (CAB) meetings to align on change risk, impact, and approval recommendations through real-time collaborative voting sessions.",
+    "license": "UNLICENSED",
+    "scripts": {
+        "build": "now-sdk build",
+        "deploy": "now-sdk install",
+        "transform": "now-sdk transform",
+        "types": "now-sdk dependencies"
+    },
+    "devDependencies": {
+        "@servicenow/sdk": "4.6.0",
+        "@servicenow/glide": "26.0.1",
+        "eslint": "8.50.0",
+        "@servicenow/eslint-plugin-sdk-app-plugin": "4.6.0"
+    },
+    "dependencies": {
+        "react": "18.2.0",
+        "react-dom": "18.2.0"
+    }
+}

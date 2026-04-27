@@ -156,67 +156,34 @@ export class CabPokerService {
         }
     }
 
-    // Safe session loading that doesn't throw errors
-    async getSessionSafely(sessionId) {
-        try {
-            const response = await fetch(`/api/now/table/x_1862662_cab_poke_session/${sessionId}?sysparm_display_value=all`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-UserToken': window.g_ck || ''
-                }
-            });
-            
-            if (response.ok) {
-                const responseText = await response.text();
-                const data = JSON.parse(responseText);
-                return data.result;
-            } else {
-                console.warn('Could not load session data from Table API, status:', response.status);
-                return null;
+    // Get session details via the scoped Scripted REST endpoint.
+    // This goes through OUR ACL chain (chair or participant only), unlike the
+    // OOTB Table API which 404s for users that lack the platform-wide read role.
+    async getSession(sessionId) {
+        const response = await fetch(`${this.baseUrl}/session/${sessionId}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-UserToken': window.g_ck || ''
             }
-        } catch (error) {
-            console.warn('Session data loading failed, but continuing:', error.message);
-            return null;
+        });
+        const text = await response.text();
+        if (!response.ok) {
+            let msg = `HTTP ${response.status}: ${response.statusText}`;
+            try { msg = JSON.parse(text).error || msg; } catch (_) { msg = text || msg; }
+            throw new Error(msg);
         }
+        return text ? JSON.parse(text) : null;
     }
 
-    // Helper method to get session details using Table API (throws errors)
-    async getSession(sessionId) {
+    // Same call but swallows errors — used by polling loops where a transient
+    // failure shouldn't surface to the user.
+    async getSessionSafely(sessionId) {
         try {
-            const response = await fetch(`/api/now/table/x_1862662_cab_poke_session/${sessionId}?sysparm_display_value=all`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-UserToken': window.g_ck || ''
-                }
-            });
-            
-            const responseText = await response.text();
-            console.log('Session API response:', response.status, responseText);
-            
-            if (!response.ok) {
-                let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-                if (responseText) {
-                    try {
-                        const errorData = JSON.parse(responseText);
-                        errorMessage = errorData.error?.message || errorData.message || errorMessage;
-                    } catch (parseError) {
-                        errorMessage = responseText || errorMessage;
-                    }
-                }
-                throw new Error(errorMessage);
-            }
-
-            const data = JSON.parse(responseText);
-            return data.result;
+            return await this.getSession(sessionId);
         } catch (error) {
-            console.error('Error getting session:', error);
-            if (error instanceof Error) {
-                throw error;
-            } else {
-                throw new Error(String(error) || 'Unknown error occurred while getting session');
-            }
+            console.warn('getSessionSafely failed:', error.message);
+            return null;
         }
     }
 
@@ -490,25 +457,24 @@ export class CabPokerService {
         }
     }
 
-    // Helper method to get session participants - also using safe approach
+    // Get participants via the scoped Scripted REST endpoint (same ACL reasoning
+    // as getSession). Returns [] on any error so the polling loop is fault-tolerant.
     async getParticipants(sessionId) {
         try {
-            const response = await fetch(`/api/now/table/x_1862662_cab_poke_participant?sysparm_query=session=${sessionId}&sysparm_display_value=all`, {
+            const response = await fetch(`${this.baseUrl}/session/${sessionId}/participants`, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
                     'X-UserToken': window.g_ck || ''
                 }
             });
-            
-            if (response.ok) {
-                const responseText = await response.text();
-                const data = JSON.parse(responseText);
-                return data.result || [];
-            } else {
-                console.warn('Could not load participants, status:', response.status);
+            if (!response.ok) {
+                console.warn('getParticipants failed, status:', response.status);
                 return [];
             }
+            const text = await response.text();
+            const data = text ? JSON.parse(text) : {};
+            return data.participants || [];
         } catch (error) {
             console.warn('Participants loading failed:', error.message);
             return [];

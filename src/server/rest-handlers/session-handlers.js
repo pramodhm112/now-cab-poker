@@ -171,6 +171,114 @@ function joinOrRejoin(sessionCode, userId, response) {
     });
 }
 
+// GET /session/{session_id} — return the fields the client UI needs.
+// Routed through Scripted REST so it uses *our* ACL chain instead of the OOTB
+// Table API, which returns 404 for any record a user can't read.
+export function getSession(request, response) {
+    try {
+        const sessionId = request.pathParams && request.pathParams.session_id;
+        const userId = gs.getUserID();
+
+        if (!sessionId) {
+            return sendJson(response, 400, { error: 'session_id path parameter is required' });
+        }
+        if (!userId) {
+            return sendJson(response, 401, { error: 'Authentication required' });
+        }
+
+        const sessionGr = new GlideRecord('x_1862662_cab_poke_session');
+        if (!sessionGr.get(sessionId)) {
+            return sendJson(response, 404, { error: 'Session not found' });
+        }
+
+        // Caller must be either the chair or a participant of this session.
+        const isChair = sessionGr.getValue('chair_user') === userId;
+        let isParticipant = false;
+        if (!isChair) {
+            const part = new GlideRecord('x_1862662_cab_poke_participant');
+            part.addQuery('session', sessionId);
+            part.addQuery('user', userId);
+            part.query();
+            isParticipant = part.hasNext();
+        }
+        if (!isChair && !isParticipant) {
+            return sendJson(response, 403, { error: 'Not a member of this session' });
+        }
+
+        sendJson(response, 200, {
+            sys_id: sessionGr.getUniqueValue(),
+            session_code: sessionGr.getValue('session_code'),
+            session_status: sessionGr.getValue('session_status'),
+            voting_timer: parseInt(sessionGr.getValue('voting_timer'), 10) || 30,
+            voting_start_time: sessionGr.getValue('voting_start_time'),
+            change_request: sessionGr.getValue('change_request'),
+            chair_user: sessionGr.getValue('chair_user'),
+            chair_user_display: sessionGr.getDisplayValue('chair_user'),
+            final_risk: sessionGr.getValue('final_risk'),
+            final_impact: sessionGr.getValue('final_impact'),
+            final_recommendation: sessionGr.getValue('final_recommendation'),
+            active: sessionGr.getValue('active') === '1'
+        });
+    } catch (e) {
+        gs.error('CAB Poker - Get Session Exception: ' + e.message);
+        sendJson(response, 500, { error: 'Internal server error: ' + e.message });
+    }
+}
+
+// GET /session/{session_id}/participants — list of participants for the chair UI.
+export function getParticipants(request, response) {
+    try {
+        const sessionId = request.pathParams && request.pathParams.session_id;
+        const userId = gs.getUserID();
+
+        if (!sessionId) {
+            return sendJson(response, 400, { error: 'session_id path parameter is required' });
+        }
+        if (!userId) {
+            return sendJson(response, 401, { error: 'Authentication required' });
+        }
+
+        const sessionGr = new GlideRecord('x_1862662_cab_poke_session');
+        if (!sessionGr.get(sessionId)) {
+            return sendJson(response, 404, { error: 'Session not found' });
+        }
+
+        const isChair = sessionGr.getValue('chair_user') === userId;
+        let isParticipant = false;
+        if (!isChair) {
+            const me = new GlideRecord('x_1862662_cab_poke_participant');
+            me.addQuery('session', sessionId);
+            me.addQuery('user', userId);
+            me.query();
+            isParticipant = me.hasNext();
+        }
+        if (!isChair && !isParticipant) {
+            return sendJson(response, 403, { error: 'Not a member of this session' });
+        }
+
+        const participants = [];
+        const part = new GlideRecord('x_1862662_cab_poke_participant');
+        part.addQuery('session', sessionId);
+        part.orderBy('join_time');
+        part.query();
+        while (part.next()) {
+            participants.push({
+                sys_id: part.getUniqueValue(),
+                user: part.getValue('user'),
+                user_display: part.getDisplayValue('user'),
+                is_online: part.getValue('is_online') === '1',
+                has_voted: part.getValue('has_voted') === '1',
+                join_time: part.getValue('join_time'),
+                last_activity: part.getValue('last_activity')
+            });
+        }
+        sendJson(response, 200, { participants: participants });
+    } catch (e) {
+        gs.error('CAB Poker - Get Participants Exception: ' + e.message);
+        sendJson(response, 500, { error: 'Internal server error: ' + e.message });
+    }
+}
+
 export function joinSession(request, response) {
     try {
         joinOrRejoin(extractSessionCode(request), gs.getUserID(), response);

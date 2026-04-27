@@ -385,8 +385,8 @@ export default function SessionDashboard({ service, session, onError }) {
     };
 
     const renderParticipants = () => {
-        const onlineCount = participants.filter(p => String(p.is_online) === 'true').length;
-        const votedCount = participants.filter(p => String(p.has_voted) === 'true').length;
+        const onlineCount = participants.filter(p => p.is_online === true || String(p.is_online) === 'true').length;
+        const votedCount = participants.filter(p => p.has_voted === true || String(p.has_voted) === 'true').length;
         
         return (
             <div className="participants-panel">
@@ -398,14 +398,14 @@ export default function SessionDashboard({ service, session, onError }) {
                 </h3>
                 <div className="participants-list">
                     {participants.map(participant => {
-                        const userName = typeof participant.user === 'object' 
-                            ? participant.user.display_value 
-                            : participant.user;
-                        const isOnline = String(participant.is_online) === 'true';
-                        const hasVoted = String(participant.has_voted) === 'true';
-                        
+                        const userName = participant.user_display
+                            || (typeof participant.user === 'object' ? participant.user.display_value : participant.user);
+                        const isOnline = participant.is_online === true || String(participant.is_online) === 'true';
+                        const hasVoted = participant.has_voted === true || String(participant.has_voted) === 'true';
+                        const sysId = typeof participant.sys_id === 'object' ? participant.sys_id.value : participant.sys_id;
+
                         return (
-                            <div key={typeof participant.sys_id === 'object' ? participant.sys_id.value : participant.sys_id} className="participant-item">
+                            <div key={sysId} className="participant-item">
                                 <span className="participant-name">{userName}</span>
                                 <div className="participant-status">
                                     <span className={`status-indicator ${isOnline ? 'online' : 'offline'}`}>

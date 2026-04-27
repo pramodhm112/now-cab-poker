@@ -69,6 +69,14 @@ declare global {
                         table: 'sys_security_acl'
                         id: '18a2710a874547c397fde370ceb8b5c4'
                     }
+                    'cab-vote-audit-create-acl': {
+                        table: 'sys_security_acl'
+                        id: 'f100030a277e44049153ee4a6f4404ac'
+                    }
+                    'cab-vote-audit-read-acl': {
+                        table: 'sys_security_acl'
+                        id: '935313c3772049058ddcef825bbcf798'
+                    }
                     'cab-vote-create-acl': {
                         table: 'sys_security_acl'
                         id: '2c2bbe42052f4141bf0686aabe60e1ad'
@@ -133,9 +141,17 @@ declare global {
                         table: 'sys_ws_operation'
                         id: 'eda6c673fba149d08c00aac63754e53a'
                     }
+                    e4c9e849932c4b102e9e3a8efaba1070: {
+                        table: 'sys_scope_privilege'
+                        id: 'e4c9e849932c4b102e9e3a8efaba1070'
+                    }
                     f707448193284b102e9e3a8efaba106e: {
                         table: 'sys_scope_privilege'
                         id: 'f707448193284b102e9e3a8efaba106e'
+                    }
+                    'finalize-session': {
+                        table: 'sys_ws_operation'
+                        id: '08098676082b48ffb8cf1872554e0490'
                     }
                     'join-session': {
                         table: 'sys_ws_operation'
@@ -156,6 +172,7 @@ declare global {
                     'sample-session': {
                         table: 'x_1862662_cab_poke_session'
                         id: '9b40ec6dc52d43f09ef3d3615cdc5704'
+                        deleted: true
                     }
                     'session-completion-br': {
                         table: 'sys_script'
@@ -184,6 +201,7 @@ declare global {
                     'test-body': {
                         table: 'sys_ws_operation'
                         id: 'becbef757599482f8a2a2ec5319583b1'
+                        deleted: true
                     }
                     'test-user-1': {
                         table: 'sys_user'
@@ -233,12 +251,42 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '035130afd578497a9bd7d344e149243e'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'event_time'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '054b42417c7b492aa1b701816d1d7db1'
                         key: {
                             name: 'x_1862662_cab_poke_session'
                             element: 'final_risk'
                             value: 'high'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '05a0db5f3f314ef5846c4eb53e01ddd7'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'action'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '076d5a9c094348acb9d13d04dc81fb6b'
+                        key: {
+                            sys_security_acl: 'f100030a277e44049153ee4a6f4404ac'
+                            sys_user_role: {
+                                id: '80abef5c8e5a47bc80a687c05713ef80'
+                                key: {
+                                    name: 'x_1862662_cab_poke.cab_poker_chair'
+                                }
+                            }
                         }
                     },
                     {
@@ -263,6 +311,15 @@ declare global {
                         key: {
                             name: 'x_1862662_cab_poke_vote'
                             element: 'recommendation_vote'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '0b7e2d710b6648b5b3d90f785296adf7'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'action'
+                            language: 'en'
                         }
                     },
                     {
@@ -313,6 +370,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '1465446e0d9a45a69fbc42bcb6fbf247'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'details'
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: '17d99c0cda5e419b9a1cd64864c79e6c'
                         key: {
@@ -334,6 +399,13 @@ declare global {
                         key: {
                             application_file: '0990bf78765e4a29a453bd3e9198272c'
                             source_artifact: '70b18357979d45bb840d5c9c73da8917'
+                        }
+                    },
+                    {
+                        table: 'ua_table_licensing_config'
+                        id: '1e20e36e120f4ae49a9703d3df58b396'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
                         }
                     },
                     {
@@ -378,6 +450,15 @@ declare global {
                     },
                     {
                         table: 'sys_choice'
+                        id: '2473c52b35de489ea3c3a4514fa5c1bf'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'action'
+                            value: 'reveal_votes'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
                         id: '26bba2f5454a4a5ba3450b6c3c2dfdb6'
                         key: {
                             name: 'x_1862662_cab_poke_vote'
@@ -416,6 +497,14 @@ declare global {
                     },
                     {
                         table: 'sys_dictionary'
+                        id: '2dd2961ebf6242f18b8dc7a0eaf25333'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'event_time'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
                         id: '2eeaec98baf94c16ba54c4e5396f57f3'
                         key: {
                             name: 'x_1862662_cab_poke_session'
@@ -450,6 +539,14 @@ declare global {
                     },
                     {
                         table: 'sys_dictionary'
+                        id: '32cba75b4f9248588e763f1169e3bd76'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'user'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
                         id: '3553de90aa14420e8db782598ef18cc0'
                         key: {
                             name: 'x_1862662_cab_poke_session'
@@ -472,6 +569,19 @@ declare global {
                             name: 'x_1862662_cab_poke_session'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '399b567a05ee4680b2c84c37f5be12e3'
+                        key: {
+                            sys_security_acl: '935313c3772049058ddcef825bbcf798'
+                            sys_user_role: {
+                                id: '80abef5c8e5a47bc80a687c05713ef80'
+                                key: {
+                                    name: 'x_1862662_cab_poke.cab_poker_chair'
+                                }
+                            }
                         }
                     },
                     {
@@ -577,6 +687,24 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '60812e5bdb0e4b0fbaadfd8ea5e465e1'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'action'
+                            value: 'submit_vote'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '60e5d6eb8b584271a325aed6d2ff6797'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'NULL'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '6154d5ae33b94b8db566656bcd8efb44'
                         key: {
@@ -652,6 +780,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '70a4905d4396487d9b3ee6b4b36e3554'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'action'
+                            value: 'update_vote'
+                        }
+                    },
+                    {
                         table: 'sn_glider_source_artifact'
                         id: '70b18357979d45bb840d5c9c73da8917'
                         key: {
@@ -697,6 +834,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '7b9aee7f309f46be8b8faf952c9d4265'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'user'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '7ec7d6883aa64a6eba3685b2dba30764'
                         key: {
@@ -725,6 +871,19 @@ declare global {
                         id: '80e2a5ae607140c5a9675e1b6ddce9fc'
                         key: {
                             sys_security_acl: '2c2bbe42052f4141bf0686aabe60e1ad'
+                            sys_user_role: {
+                                id: '6c1709beb66741b3834b8698ddd887ed'
+                                key: {
+                                    name: 'x_1862662_cab_poke.cab_poker_member'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '817066a2a4764b76a601eaa8e58ec602'
+                        key: {
+                            sys_security_acl: 'f100030a277e44049153ee4a6f4404ac'
                             sys_user_role: {
                                 id: '6c1709beb66741b3834b8698ddd887ed'
                                 key: {
@@ -773,6 +932,22 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_db_object'
+                        id: '8e316ccc2ebd41a4858ba9c138e7e741'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '8f51cbf181dc4d359c6500619da0e30a'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'session'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '9247f3a9bbc043e4b81f24775a818325'
                         key: {
@@ -787,6 +962,14 @@ declare global {
                             name: 'x_1862662_cab_poke_session'
                             element: 'session_status'
                             value: 'revealing'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '97b6a60cb5cd466caf233807e7aa2c9e'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'NULL'
                         }
                     },
                     {
@@ -848,11 +1031,29 @@ declare global {
                     },
                     {
                         table: 'sys_choice'
+                        id: 'a5637c63222d4046a3ef177e8d163a60'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'action'
+                            value: 'finalize'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
                         id: 'a66403295fbc4951a3c9272e36389da6'
                         key: {
                             name: 'x_1862662_cab_poke_session'
                             element: 'final_risk'
                             value: 'low'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'a6a15f72e2cc4f55ba28fc181d74826b'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'details'
+                            language: 'en'
                         }
                     },
                     {
@@ -976,6 +1177,14 @@ declare global {
                             name: 'x_1862662_cab_poke_participant'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_choice_set'
+                        id: 'b9c41a35cc3e407cad602c09258f4438'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'action'
                         }
                     },
                     {
@@ -1138,6 +1347,14 @@ declare global {
                     },
                     {
                         table: 'sys_dictionary'
+                        id: 'e0aaf92576cf47ff80862751725b0d0d'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'session'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
                         id: 'e67e596f60144acaa41805cc832b612f'
                         key: {
                             name: 'x_1862662_cab_poke_vote'
@@ -1246,6 +1463,15 @@ declare global {
                         key: {
                             name: 'x_1862662_cab_poke_session'
                             element: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'f83469b85d2b4ac1b16ca3b827279864'
+                        key: {
+                            name: 'x_1862662_cab_poke_vote_audit'
+                            element: 'action'
+                            value: 'start_voting'
                         }
                     },
                     {

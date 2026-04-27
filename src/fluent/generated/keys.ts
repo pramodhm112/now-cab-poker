@@ -153,6 +153,42 @@ declare global {
                         table: 'sys_ws_operation'
                         id: '08098676082b48ffb8cf1872554e0490'
                     }
+                    'get-participants': {
+                        table: 'sys_ws_operation'
+                        id: 'f1c35c25ce81417699c8d15c99c80e40'
+                    }
+                    'get-session': {
+                        table: 'sys_ws_operation'
+                        id: '423fd8ab0ecb4d1f948d49fe485890a6'
+                    }
+                    'get-session-cr': {
+                        table: 'sys_ws_operation'
+                        id: '36a10cfa8bd640e4b805e089b42bee44'
+                    }
+                    'grant-chair-alice': {
+                        table: 'sys_user_has_role'
+                        id: '32e6a06753af4344aef3212e29fb9ed9'
+                    }
+                    'grant-member-bob': {
+                        table: 'sys_user_has_role'
+                        id: '61614a9ee1464bb1918f0dd3029d3fdb'
+                    }
+                    'grant-member-carol': {
+                        table: 'sys_user_has_role'
+                        id: 'ef3f073507fb4779b6fc25b6f1090fcb'
+                    }
+                    'grant-member-david': {
+                        table: 'sys_user_has_role'
+                        id: '75c8b050dbc74d4cb99a62355ffa2ea3'
+                    }
+                    'grant-member-emily': {
+                        table: 'sys_user_has_role'
+                        id: 'a0e51deaae224d98b2f66f3795a9f901'
+                    }
+                    'grant-member-frank': {
+                        table: 'sys_user_has_role'
+                        id: '754798b092cb4cdc8ac4518410e88fc3'
+                    }
                     'join-session': {
                         table: 'sys_ws_operation'
                         id: '23c29f7295af49298b675df44f664a20'
